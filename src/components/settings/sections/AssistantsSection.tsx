@@ -79,6 +79,9 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
       name: '',
       description: '',
       systemPrompt: '',
+      modelId: settings.chatModelId || 'openai/gpt-5',
+      modelFallback: undefined,
+      tools: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }

@@ -196,31 +196,31 @@ export const en: TranslationKeys = {
         'Default top p for new conversations (0.0-1.0); leave empty to use the model default.',
     },
     assistants: {
-      title: 'Assistants',
-      desc: 'Create and manage custom AI assistants',
-      addAssistant: 'Add assistant',
-      editAssistant: 'Edit assistant',
-      deleteAssistant: 'Delete assistant',
+      title: 'Agents',
+      desc: 'Create and manage custom AI agents',
+      addAssistant: 'Add agent',
+      editAssistant: 'Edit agent',
+      deleteAssistant: 'Delete agent',
       name: 'Name',
       description: 'Description',
       systemPrompt: 'System prompt',
       systemPromptDesc:
         'This prompt will be added to the beginning of every chat.',
       systemPromptPlaceholder:
-        "Enter system prompt to define assistant's behavior and capabilities",
-      namePlaceholder: 'Enter assistant name',
-      defaultAssistantName: 'New assistant',
-      deleteConfirmTitle: 'Confirm delete assistant',
-      deleteConfirmMessagePrefix: 'Are you sure you want to delete assistant',
+        "Enter system prompt to define agent's behavior and capabilities",
+      namePlaceholder: 'Enter agent name',
+      defaultAssistantName: 'New agent',
+      deleteConfirmTitle: 'Confirm delete agent',
+      deleteConfirmMessagePrefix: 'Are you sure you want to delete agent',
       deleteConfirmMessageSuffix: ' This action cannot be undone.',
-      addAssistantAria: 'Add new assistant',
-      deleteAssistantAria: 'Delete assistant',
+      addAssistantAria: 'Add new agent',
+      deleteAssistantAria: 'Delete agent',
       actions: 'Actions',
       maxContextMessagesDesc:
-        'If set, this assistant will use this number of previous chat messages, overriding the global default.',
-      noAssistants: 'No assistants available',
+        'If set, this agent will use this number of previous chat messages, overriding the global default.',
+      noAssistants: 'No agents available',
       noAssistant: 'Default',
-      selectAssistant: 'Select assistant',
+      selectAssistant: 'Select agent',
     },
     providers: {
       title: 'Providers',
@@ -434,7 +434,8 @@ export const en: TranslationKeys = {
       smartSpaceTriggerMode: 'Empty-line space trigger',
       smartSpaceTriggerModeDesc:
         'How smart space should respond when you press space on an empty line.',
-      smartSpaceTriggerModeSingle: 'Single space to trigger (original behavior)',
+      smartSpaceTriggerModeSingle:
+        'Single space to trigger (original behavior)',
       smartSpaceTriggerModeDouble:
         'Double space to trigger (~600ms; first space inserts a real space)',
       smartSpaceTriggerModeOff:
@@ -694,7 +695,9 @@ export const en: TranslationKeys = {
     modeEditDirectDesc: 'Edit document directly without confirmation',
     editNoFile: 'Please open a file first',
     editNoChanges: 'No valid changes returned by model',
-    editPartialSuccess: 'Applied ${appliedCount} of ${blocks.length} edits. Check console for details.',
-    editApplied: 'Successfully applied ${appliedCount} edit(s) to ${activeFile.name}',
+    editPartialSuccess:
+      'Applied ${appliedCount} of ${blocks.length} edits. Check console for details.',
+    editApplied:
+      'Successfully applied ${appliedCount} edit(s) to ${activeFile.name}',
   },
 }

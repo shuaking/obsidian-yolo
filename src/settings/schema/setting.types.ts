@@ -7,13 +7,34 @@ import {
   DEFAULT_EMBEDDING_MODELS,
   DEFAULT_PROVIDERS,
 } from '../../constants'
-import { assistantSchema } from '../../types/assistant.types'
+import {
+  agentToolConfigSchema,
+  assistantIconSchema,
+} from '../../types/assistant.types'
 import { chatModelSchema } from '../../types/chat-model.types'
 import { embeddingModelSchema } from '../../types/embedding-model.types'
 import { mcpServerConfigSchema } from '../../types/mcp.types'
 import { llmProviderSchema } from '../../types/provider.types'
 
 import { SETTINGS_SCHEMA_VERSION } from './migrations'
+
+// Assistant schema for settings - matches the Assistant type with defaults
+const assistantSettingsSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Name cannot be empty'),
+  description: z.string().optional(),
+  systemPrompt: z.string().min(1, 'System prompt cannot be empty'),
+  icon: assistantIconSchema.optional(),
+
+  // Agent-specific fields
+  modelId: z.string().optional(),
+  modelFallback: z.string().optional(),
+  tools: z.array(agentToolConfigSchema).default([]),
+
+  // Timestamps
+  createdAt: z.number().optional(),
+  updatedAt: z.number().optional(),
+})
 
 const ragOptionsSchema = z.object({
   enabled: z.boolean().catch(true),
@@ -272,7 +293,7 @@ export const smartComposerSettingsSchema = z.object({
     }),
 
   // Assistant list
-  assistants: z.array(assistantSchema).catch([]),
+  assistants: z.array(assistantSettingsSchema).catch([]).default([]),
 
   // Currently selected assistant ID
   currentAssistantId: z.string().optional(),
