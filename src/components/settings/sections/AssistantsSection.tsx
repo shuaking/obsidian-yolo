@@ -20,6 +20,7 @@ import React, { type FC, useState } from 'react'
 import { useLanguage } from '../../../contexts/language-context'
 import { useSettings } from '../../../contexts/settings-context'
 import { Assistant, AssistantIcon } from '../../../types/assistant.types'
+import { exportAgents, importAgents } from '../../../utils/agents-import-export'
 import { renderAssistantIcon } from '../../../utils/assistant-icon'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
@@ -27,6 +28,8 @@ import { ObsidianTextArea } from '../../common/ObsidianTextArea'
 import { ObsidianTextInput } from '../../common/ObsidianTextInput'
 import { ConfirmModal } from '../../modals/ConfirmModal'
 import { openIconPicker } from '../assistants/AssistantIconPicker'
+import { ModelPicker } from '../inputs/ModelPicker'
+import { ToolSelector } from '../inputs/ToolSelector'
 
 type AssistantsSectionProps = {
   app: App
@@ -79,11 +82,31 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
       name: '',
       description: '',
       systemPrompt: '',
+      modelId: settings.chatModelId, // Default to current chat model
+      tools: [], // Empty tools by default
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
     setEditingAssistant(newAssistant)
     setIsAddingAssistant(true)
+  }
+
+  const handleExportAgents = () => {
+    void exportAgents(app, assistants, t)
+  }
+
+  const handleImportAgents = async () => {
+    await importAgents(
+      app,
+      assistants,
+      async (importedAgents) => {
+        await setSettings({
+          ...settings,
+          assistants: importedAgents,
+        })
+      },
+      t,
+    )
   }
 
   const handleSaveAssistant = async () => {
@@ -241,13 +264,28 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
   return (
     <div className="smtcmp-settings-section">
       <ObsidianSetting
-        name={t('settings.assistants.title')}
-        desc={t('settings.assistants.desc')}
+        name={t('settings.assistants.agentsTitle', 'Agents')}
+        desc={t(
+          'settings.assistants.agentsDesc',
+          'Create and manage AI agents with specific models and tools',
+        )}
       >
-        <ObsidianButton
-          text={t('settings.assistants.addAssistant')}
-          onClick={handleAddAssistant}
-        />
+        <div className="smtcmp-agent-actions">
+          <ObsidianButton
+            text={t('settings.assistants.addAssistant')}
+            onClick={handleAddAssistant}
+          />
+          <ObsidianButton
+            text={t('settings.assistants.exportAgents', 'Export agents')}
+            onClick={handleExportAgents}
+            icon="download"
+          />
+          <ObsidianButton
+            text={t('settings.assistants.importAgents', 'Import agents')}
+            onClick={handleImportAgents}
+            icon="upload"
+          />
+        </div>
       </ObsidianSetting>
 
       {/* Add new assistant form */}
@@ -255,13 +293,13 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
         <div className="smtcmp-assistant-editor smtcmp-assistant-editor-new">
           <ObsidianSetting
             name={t('settings.assistants.name', 'Name')}
-            desc={t('settings.assistants.nameDesc', 'Assistant name')}
+            desc={t('settings.assistants.nameDesc', 'Agent name')}
           >
             <ObsidianTextInput
               value={editingAssistant.name}
               placeholder={t(
                 'settings.assistants.namePlaceholder',
-                'Enter assistant name',
+                'Enter agent name',
               )}
               onChange={(value) =>
                 setEditingAssistant({ ...editingAssistant, name: value })
@@ -273,7 +311,7 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
             name={t('settings.assistants.description', 'Description')}
             desc={t(
               'settings.assistants.descriptionDesc',
-              'Brief description of what this assistant does',
+              'Brief description of what this agent does',
             )}
           >
             <ObsidianTextInput
@@ -287,6 +325,32 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
               }
             />
           </ObsidianSetting>
+
+          <ObsidianSetting
+            name={t('settings.assistants.model', 'Model')}
+            desc={t(
+              'settings.assistants.modelDesc',
+              'Chat model to use for this agent',
+            )}
+          >
+            <ModelPicker
+              selectedModelId={editingAssistant.modelId}
+              onModelSelected={(modelId) =>
+                setEditingAssistant({ ...editingAssistant, modelId })
+              }
+              placeholder={t(
+                'settings.assistants.modelPlaceholder',
+                'Select a chat model',
+              )}
+            />
+          </ObsidianSetting>
+
+          <ToolSelector
+            selectedTools={editingAssistant.tools || []}
+            onToolsChange={(tools) =>
+              setEditingAssistant({ ...editingAssistant, tools })
+            }
+          />
 
           <ObsidianSetting
             name={t('settings.assistants.icon', '图标')}
@@ -321,7 +385,7 @@ export const AssistantsSection: FC<AssistantsSectionProps> = ({ app }) => {
               }
               placeholder={t(
                 'settings.assistants.systemPromptPlaceholder',
-                "Enter system prompt to define assistant's behavior and capabilities",
+                "Enter system prompt to define agent's behavior and capabilities",
               )}
             />
           </ObsidianSetting>
@@ -454,6 +518,18 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
                   {assistant.description}
                 </div>
               )}
+              <div className="smtcmp-assistant-meta">
+                {assistant.modelId && (
+                  <span className="smtcmp-assistant-model">
+                    Model: {assistant.modelId}
+                  </span>
+                )}
+                {assistant.tools && assistant.tools.length > 0 && (
+                  <span className="smtcmp-assistant-tools">
+                    Tools: {assistant.tools.length} selected
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -491,13 +567,13 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
         <div className="smtcmp-assistant-editor smtcmp-assistant-editor-inline">
           <ObsidianSetting
             name={t('settings.assistants.name', 'Name')}
-            desc={t('settings.assistants.nameDesc', 'Assistant name')}
+            desc={t('settings.assistants.nameDesc', 'Agent name')}
           >
             <ObsidianTextInput
               value={currentEditing.name}
               placeholder={t(
                 'settings.assistants.namePlaceholder',
-                'Enter assistant name',
+                'Enter agent name',
               )}
               onChange={(value) =>
                 setEditingAssistant({
@@ -512,7 +588,7 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
             name={t('settings.assistants.description', 'Description')}
             desc={t(
               'settings.assistants.descriptionDesc',
-              'Brief description of what this assistant does',
+              'Brief description of what this agent does',
             )}
           >
             <ObsidianTextInput
@@ -529,6 +605,32 @@ const AssistantListItem: FC<AssistantListItemProps> = ({
               }
             />
           </ObsidianSetting>
+
+          <ObsidianSetting
+            name={t('settings.assistants.model', 'Model')}
+            desc={t(
+              'settings.assistants.modelDesc',
+              'Chat model to use for this agent',
+            )}
+          >
+            <ModelPicker
+              selectedModelId={currentEditing.modelId}
+              onModelSelected={(modelId) =>
+                setEditingAssistant({ ...currentEditing, modelId })
+              }
+              placeholder={t(
+                'settings.assistants.modelPlaceholder',
+                'Select a chat model',
+              )}
+            />
+          </ObsidianSetting>
+
+          <ToolSelector
+            selectedTools={currentEditing.tools || []}
+            onToolsChange={(tools) =>
+              setEditingAssistant({ ...currentEditing, tools })
+            }
+          />
 
           <ObsidianSetting
             name={t('settings.assistants.icon', '图标')}

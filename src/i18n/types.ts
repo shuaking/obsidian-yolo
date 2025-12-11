@@ -162,6 +162,33 @@ export type TranslationKeys = {
       duplicate?: string
       copySuffix?: string
       currentBadge?: string
+      // Enhanced agent features
+      agentsTitle?: string
+      agentsDesc?: string
+      model?: string
+      modelDesc?: string
+      modelPlaceholder?: string
+      tools?: string
+      toolsDesc?: string
+      noToolsAvailable?: string
+      schema?: string
+      selectAll?: string
+      clear?: string
+      // Import/Export
+      exportAgents?: string
+      importAgents?: string
+      exportSuccessFile?: string
+      exportSuccessClipboard?: string
+      exportSuccessDownload?: string
+      exportError?: string
+      importError?: string
+      importErrorNoFile?: string
+      importErrorNoContent?: string
+      importErrorInvalidFormat?: string
+      importWarningPartial?: string
+      importErrorNoValidAgents?: string
+      importSuccess?: string
+      agentsImported?: string
     }
     providers: {
       title: string
