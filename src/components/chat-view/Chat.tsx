@@ -47,6 +47,11 @@ import {
 import { groupAssistantAndToolMessages } from '../../utils/chat/message-groups'
 import { PromptGenerator } from '../../utils/chat/promptGenerator'
 import { readTFileContent } from '../../utils/obsidian'
+import {
+  getActiveAssistant,
+  getAssistantToolAllowList,
+  resolveChatModelId,
+} from '../../utils/assistant-config'
 import { ErrorModal } from '../modals/ErrorModal'
 
 // removed Prompt Templates feature
@@ -114,6 +119,24 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   const { t } = useLanguage()
   const { getRAGEngine } = useRAG()
   const { getMcpManager } = useMcp()
+
+  const activeAssistant = useMemo(() => getActiveAssistant(settings), [settings])
+  const allowedToolNames = useMemo(
+    () => getAssistantToolAllowList(settings),
+    [settings],
+  )
+  const defaultConversationModelId = useMemo(() => {
+    try {
+      return resolveChatModelId(
+        settings,
+        activeAssistant?.modelId,
+        settings.chatModelId,
+      )
+    } catch (error) {
+      console.warn('[Smart Composer] Falling back to default chat model', error)
+      return settings.chatModels[0]?.id ?? settings.chatModelId
+    }
+  }, [settings, activeAssistant])
 
   const {
     createOrUpdateConversation,
@@ -189,14 +212,45 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
   // Per-conversation model id (do NOT write back to global settings)
   const conversationModelIdRef = useRef<Map<string, string>>(new Map())
   const [conversationModelId, setConversationModelId] = useState<string>(
-    settings.chatModelId,
+    () => defaultConversationModelId,
   )
+  const previousAssistantIdRef = useRef<string | undefined>(
+    settings.currentAssistantId,
+  )
+  const previousDefaultModelRef = useRef(defaultConversationModelId)
 
   // Per-message model mapping for historical user messages
   const [messageModelMap, setMessageModelMap] = useState<Map<string, string>>(
     new Map(),
   )
   const submitMutationPendingRef = useRef(false)
+
+  useEffect(() => {
+    if (
+      previousAssistantIdRef.current === settings.currentAssistantId &&
+      previousDefaultModelRef.current === defaultConversationModelId
+    ) {
+      return
+    }
+    previousAssistantIdRef.current = settings.currentAssistantId
+    previousDefaultModelRef.current = defaultConversationModelId
+
+    setConversationModelId(defaultConversationModelId)
+    conversationModelIdRef.current = new Map(
+      Array.from(conversationModelIdRef.current.keys()).map((conversationId) => [
+        conversationId,
+        defaultConversationModelId,
+      ]),
+    )
+    conversationModelIdRef.current.set(
+      currentConversationId,
+      defaultConversationModelId,
+    )
+  }, [
+    defaultConversationModelId,
+    settings.currentAssistantId,
+    currentConversationId,
+  ])
 
   const groupedChatMessages: (ChatUserMessage | AssistantToolMessageGroup)[] =
     useMemo(() => {
@@ -273,6 +327,7 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     promptGenerator,
     conversationOverrides: conversationOverrides ?? undefined,
     modelId: conversationModelId,
+    allowedToolNames,
   })
 
   const persistConversation = useCallback(
@@ -324,8 +379,9 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
       }
       const modelFromRef =
         conversationModelIdRef.current.get(conversationId) ??
-        settings.chatModelId
+        defaultConversationModelId
       setConversationModelId(modelFromRef)
+      conversationModelIdRef.current.set(conversationId, modelFromRef)
       // Reset per-message model mapping when switching conversation
       setMessageModelMap(new Map())
       const newInputMessage = getNewInputMessage(
@@ -356,8 +412,8 @@ const Chat = forwardRef<ChatRef, ChatProps>((props, ref) => {
     conversationSuppressionRef.current.set(newId, 'none')
     setCurrentFileSuppression('none')
     setConversationOverrides(null)
-    conversationModelIdRef.current.set(newId, settings.chatModelId)
-    setConversationModelId(settings.chatModelId)
+    conversationModelIdRef.current.set(newId, defaultConversationModelId)
+    setConversationModelId(defaultConversationModelId)
     setMessageModelMap(new Map())
     setChatMessages([])
     const newInputMessage = getNewInputMessage(

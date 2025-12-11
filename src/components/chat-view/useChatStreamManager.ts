@@ -24,6 +24,7 @@ type UseChatStreamManagerParams = {
   promptGenerator: PromptGenerator
   conversationOverrides?: ConversationOverrideSettings
   modelId: string
+  allowedToolNames?: string[] | null
 }
 
 export type UseChatStreamManager = {
@@ -41,6 +42,7 @@ export function useChatStreamManager({
   promptGenerator,
   conversationOverrides,
   modelId,
+  allowedToolNames,
 }: UseChatStreamManagerParams): UseChatStreamManager {
   const app = useApp()
   const { settings } = useSettings()
@@ -118,6 +120,7 @@ export function useChatStreamManager({
             useWebSearch: conversationOverrides?.useWebSearch ?? false,
             useUrlContext: conversationOverrides?.useUrlContext ?? false,
           },
+          toolAllowList: allowedToolNames ?? undefined,
         })
 
         unsubscribeResponseGenerator = responseGenerator.subscribe(
