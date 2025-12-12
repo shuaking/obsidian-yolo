@@ -1,5 +1,6 @@
 # compiled output
 main.js
+dist/plugin/main.js
 /node_modules
 
 # Logs
