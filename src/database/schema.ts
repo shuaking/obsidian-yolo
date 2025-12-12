@@ -73,4 +73,33 @@ export const embeddingTable = pgTable(
 export type SelectEmbedding = typeof embeddingTable.$inferSelect
 export type InsertEmbedding = typeof embeddingTable.$inferInsert
 
+export type AgentHistoryToolCall = {
+  name: string
+  status: 'success' | 'error' | 'pending_approval'
+  result?: string
+}
+
+export const agentHistoryTable = pgTable('agent_history', {
+  id: serial('id').primaryKey(),
+  agentId: text('agent_id').notNull(), // model ID
+  surface: text('surface').notNull(), // 'chat' | 'quick-ask' | 'smart-space'
+  conversationId: text('conversation_id'),
+  startTime: bigint('start_time', { mode: 'number' }).notNull(),
+  endTime: bigint('end_time', { mode: 'number' }).notNull(),
+  inputTokens: smallint('input_tokens'),
+  outputTokens: smallint('output_tokens'),
+  totalTokens: smallint('total_tokens'),
+  toolCalls: jsonb('tool_calls').$type<AgentHistoryToolCall[]>(),
+  success: text('success').notNull(), // 'success' | 'error' | 'aborted'
+  errorMessage: text('error_message'),
+}, (table) => [
+  index('agent_history_agent_id_index').on(table.agentId),
+  index('agent_history_surface_index').on(table.surface),
+  index('agent_history_start_time_index').on(table.startTime),
+  index('agent_history_conversation_id_index').on(table.conversationId),
+])
+
+export type SelectAgentHistory = typeof agentHistoryTable.$inferSelect
+export type InsertAgentHistory = typeof agentHistoryTable.$inferInsert
+
 // removed template table

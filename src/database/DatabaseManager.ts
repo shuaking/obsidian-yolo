@@ -6,6 +6,7 @@ import { PGLITE_DB_PATH, PLUGIN_ID } from '../constants'
 
 import { PGLiteAbortedException } from './exception'
 import migrations from './migrations.json'
+import { AgentHistoryManager } from './modules/AgentHistoryManager'
 import { VectorManager } from './modules/vector/VectorManager'
 
 type DrizzleMigratableDatabase = PgliteDatabase & {
@@ -45,7 +46,7 @@ export class DatabaseManager {
   // WeakMap to prevent circular references
   private static managers = new WeakMap<
     DatabaseManager,
-    { vectorManager?: VectorManager }
+    { vectorManager?: VectorManager; agentHistoryManager?: AgentHistoryManager }
   >()
 
   constructor(app: App, dbPath: string, pgliteResourcePath: string) {
@@ -71,7 +72,10 @@ export class DatabaseManager {
     await dbManager.save()
 
     // WeakMap setup
-    const managers = { vectorManager: new VectorManager(app, dbManager.db) }
+    const managers = {
+      vectorManager: new VectorManager(app, dbManager.db),
+      agentHistoryManager: new AgentHistoryManager(dbManager.db),
+    }
 
     // save, vacuum callback setup
     const saveCallback = dbManager.save.bind(dbManager) as () => Promise<void>
@@ -104,6 +108,19 @@ export class DatabaseManager {
       }
     }
     return managers.vectorManager
+  }
+
+  getAgentHistoryManager(): AgentHistoryManager {
+    const managers = DatabaseManager.managers.get(this) ?? {}
+    if (!managers.agentHistoryManager) {
+      if (this.db) {
+        managers.agentHistoryManager = new AgentHistoryManager(this.db)
+        DatabaseManager.managers.set(this, managers)
+      } else {
+        throw new Error('Database is not initialized')
+      }
+    }
+    return managers.agentHistoryManager
   }
 
   // removed template manager

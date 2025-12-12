@@ -116,5 +116,17 @@
     "bps": true,
     "folderMillis": 1738720225813,
     "hash": "18a862af0fda7dc9e56e7122a65964a760410272de2188e777e2e0f035d7814f"
+  },
+  {
+    "sql": [
+      "CREATE TABLE IF NOT EXISTS \"agent_history\" (\n\t\"id\" serial PRIMARY KEY NOT NULL,\n\t\"agent_id\" text NOT NULL,\n\t\"surface\" text NOT NULL,\n\t\"conversation_id\" text,\n\t\"start_time\" bigint NOT NULL,\n\t\"end_time\" bigint NOT NULL,\n\t\"input_tokens\" smallint,\n\t\"output_tokens\" smallint,\n\t\"total_tokens\" smallint,\n\t\"tool_calls\" jsonb,\n\t\"success\" text NOT NULL,\n\t\"error_message\" text\n);\n",
+      "\nCREATE INDEX IF NOT EXISTS \"agent_history_agent_id_index\" ON \"agent_history\" (\"agent_id\");",
+      "\nCREATE INDEX IF NOT EXISTS \"agent_history_surface_index\" ON \"agent_history\" (\"surface\");",
+      "\nCREATE INDEX IF NOT EXISTS \"agent_history_start_time_index\" ON \"agent_history\" (\"start_time\");",
+      "\nCREATE INDEX IF NOT EXISTS \"agent_history_conversation_id_index\" ON \"agent_history\" (\"conversation_id\");"
+    ],
+    "bps": true,
+    "folderMillis": 1738720225814,
+    "hash": "1c3f8b7f9c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e"
   }
 ]
