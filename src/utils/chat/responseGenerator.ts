@@ -5,6 +5,7 @@ import { McpManager } from '../../core/mcp/mcpManager'
 import { ChatMessage, ChatToolMessage } from '../../types/chat'
 import { ChatModel } from '../../types/chat-model.types'
 import { RequestTool } from '../../types/llm/request'
+import { McpTool } from '../../types/mcp.types'
 import {
   Annotation,
   LLMResponseStreaming,
@@ -39,6 +40,7 @@ export type ResponseGeneratorParams = {
     useWebSearch?: boolean
     useUrlContext?: boolean
   }
+  toolAllowList?: string[] | null
 }
 
 export class ResponseGenerator {
@@ -61,6 +63,7 @@ export class ResponseGenerator {
     useWebSearch?: boolean
     useUrlContext?: boolean
   }
+  private readonly toolAllowList?: string[] | null
 
   private responseMessages: ChatMessage[] = [] // Response messages that are generated after the initial messages
   private subscribers: ((messages: ChatMessage[]) => void)[] = []
@@ -78,6 +81,7 @@ export class ResponseGenerator {
     this.requestParams = params.requestParams
     this.maxContextOverride = params.maxContextOverride
     this.geminiTools = params.geminiTools
+    this.toolAllowList = params.toolAllowList ?? null
   }
 
   public subscribe(callback: (messages: ChatMessage[]) => void) {
@@ -167,9 +171,10 @@ export class ResponseGenerator {
   private async streamSingleResponse(): Promise<{
     toolCallRequests: ToolCallRequest[]
   }> {
-    const availableTools = this.enableTools
+    const availableToolsRaw = this.enableTools
       ? await this.mcpManager.listAvailableTools()
       : []
+    const availableTools = this.filterToolsByAllowList(availableToolsRaw)
     const hasTools = availableTools.length > 0
 
     const requestMessages = await this.promptGenerator.generateRequestMessages({
@@ -426,6 +431,21 @@ export class ResponseGenerator {
     return {
       toolCallRequests: toolCallRequests,
     }
+  }
+
+  private filterToolsByAllowList(tools: McpTool[]): McpTool[] {
+    if (!this.toolAllowList || this.toolAllowList.length === 0) {
+      return tools
+    }
+    const allowSet = new Set(this.toolAllowList)
+    const filtered = tools.filter((tool) => allowSet.has(tool.name))
+    if (tools.length > 0 && filtered.length === 0) {
+      console.warn(
+        '[Smart Composer] No allowed tools available for current assistant',
+        { allowList: Array.from(allowSet) },
+      )
+    }
+    return filtered
   }
 
   private processChunk(
