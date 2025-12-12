@@ -1,18 +1,20 @@
-import { ChevronDown, Download, RotateCcw, Trash2 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { SelectAgentHistory, SelectAgentHistory as AgentHistoryRecord } from '../../../database/schema'
 import { useDatabase } from '../../../contexts/database-context'
 import { useLanguage } from '../../../contexts/language-context'
-import { useSettings } from '../../../contexts/settings-context'
 import { AgentHistoryStats } from '../../../database/modules/AgentHistoryManager'
-import { exportToCSV, exportToJSON, downloadFile } from '../../../utils/agent-history/exportAgentHistory'
+import { SelectAgentHistory as AgentHistoryRecord } from '../../../database/schema'
+import {
+  downloadFile,
+  exportToCSV,
+  exportToJSON,
+} from '../../../utils/agent-history/exportAgentHistory'
 import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
 
 export function AgentAnalyticsSection() {
   const { t } = useLanguage()
-  const { settings } = useSettings()
   const { getAgentHistoryManager } = useDatabase()
 
   const [isLoading, setIsLoading] = useState(false)
@@ -112,14 +114,18 @@ export function AgentAnalyticsSection() {
               </div>
             </div>
             <div className="smtcmp-stat-card">
-              <div className="smtcmp-stat-value">{stats.successfulInvocations}</div>
+              <div className="smtcmp-stat-value">
+                {stats.successfulInvocations}
+              </div>
               <div className="smtcmp-stat-label">
                 {t('settings.agentAnalytics.successful')}
               </div>
             </div>
             <div className="smtcmp-stat-card">
               <div className="smtcmp-stat-value">{stats.failedInvocations}</div>
-              <div className="smtcmp-stat-label">{t('settings.agentAnalytics.failed')}</div>
+              <div className="smtcmp-stat-label">
+                {t('settings.agentAnalytics.failed')}
+              </div>
             </div>
             <div className="smtcmp-stat-card">
               <div className="smtcmp-stat-value">
@@ -130,7 +136,9 @@ export function AgentAnalyticsSection() {
               </div>
             </div>
             <div className="smtcmp-stat-card">
-              <div className="smtcmp-stat-value">{stats.averageTotalTokens}</div>
+              <div className="smtcmp-stat-value">
+                {stats.averageTotalTokens}
+              </div>
               <div className="smtcmp-stat-label">
                 {t('settings.agentAnalytics.averageTokens')}
               </div>
@@ -161,7 +169,10 @@ export function AgentAnalyticsSection() {
         </div>
       )}
 
-      <ObsidianSetting name={t('settings.agentAnalytics.filters')} className="smtcmp-filters">
+      <ObsidianSetting
+        name={t('settings.agentAnalytics.filters')}
+        className="smtcmp-filters"
+      >
         <div className="smtcmp-filters-group">
           <label>
             {t('settings.agentAnalytics.filterByAgent')}:
@@ -229,17 +240,19 @@ export function AgentAnalyticsSection() {
                 >
                   <ChevronDown
                     size={16}
-                    className={
-                      expandedRecordId === record.id ? 'expanded' : ''
-                    }
+                    className={expandedRecordId === record.id ? 'expanded' : ''}
                   />
                   <span className="smtcmp-session-info">
                     <span className="smtcmp-agent-id">{record.agentId}</span>
-                    <span className="smtcmp-surface-badge">{record.surface}</span>
+                    <span className="smtcmp-surface-badge">
+                      {record.surface}
+                    </span>
                     <span className="smtcmp-time">
                       {new Date(record.startTime).toLocaleString()}
                     </span>
-                    <span className={`smtcmp-status smtcmp-status-${record.success}`}>
+                    <span
+                      className={`smtcmp-status smtcmp-status-${record.success}`}
+                    >
                       {record.success}
                     </span>
                   </span>
@@ -254,7 +267,9 @@ export function AgentAnalyticsSection() {
                     </div>
                     {record.inputTokens && (
                       <div className="smtcmp-detail-row">
-                        <span className="smtcmp-detail-label">Input Tokens:</span>
+                        <span className="smtcmp-detail-label">
+                          Input Tokens:
+                        </span>
                         <span className="smtcmp-detail-value">
                           {record.inputTokens}
                         </span>
@@ -262,7 +277,9 @@ export function AgentAnalyticsSection() {
                     )}
                     {record.outputTokens && (
                       <div className="smtcmp-detail-row">
-                        <span className="smtcmp-detail-label">Output Tokens:</span>
+                        <span className="smtcmp-detail-label">
+                          Output Tokens:
+                        </span>
                         <span className="smtcmp-detail-value">
                           {record.outputTokens}
                         </span>
@@ -270,7 +287,9 @@ export function AgentAnalyticsSection() {
                     )}
                     {record.totalTokens && (
                       <div className="smtcmp-detail-row">
-                        <span className="smtcmp-detail-label">Total Tokens:</span>
+                        <span className="smtcmp-detail-label">
+                          Total Tokens:
+                        </span>
                         <span className="smtcmp-detail-value">
                           {record.totalTokens}
                         </span>
@@ -304,7 +323,10 @@ export function AgentAnalyticsSection() {
         </div>
       </ObsidianSetting>
 
-      <ObsidianSetting name={t('settings.agentAnalytics.actions')} className="smtcmp-actions">
+      <ObsidianSetting
+        name={t('settings.agentAnalytics.actions')}
+        className="smtcmp-actions"
+      >
         <div className="smtcmp-actions-group">
           <ObsidianButton
             text={t('settings.agentAnalytics.exportCSV')}
@@ -325,7 +347,7 @@ export function AgentAnalyticsSection() {
             text={t('settings.agentAnalytics.clear')}
             onClick={handleClearHistory}
             icon="trash-2"
-            className="smtcmp-danger"
+            warning={true}
           />
         </div>
       </ObsidianSetting>

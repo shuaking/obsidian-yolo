@@ -8,7 +8,9 @@ export function getActiveAssistant(
   if (!currentAssistantId) {
     return null
   }
-  return assistants.find((assistant) => assistant.id === currentAssistantId) ?? null
+  return (
+    assistants.find((assistant) => assistant.id === currentAssistantId) ?? null
+  )
 }
 
 export function isModelAvailable(
@@ -89,7 +91,8 @@ export function getAssistantToolAllowListFromAssistant(
     return null
   }
   const sanitized = assistant.tools
-    .map((tool) => tool.trim())
+    .filter((tool) => tool.enabled)
+    .map((tool) => `${tool.serverId}/${tool.toolName}`)
     .filter((tool) => tool.length > 0)
   return sanitized.length > 0 ? sanitized : null
 }

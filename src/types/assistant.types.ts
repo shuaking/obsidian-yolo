@@ -26,13 +26,11 @@ export const assistantSchema = z.object({
   icon: assistantIconSchema.optional(),
 
   // Agent-specific fields (with defaults for backward compatibility)
-  modelId: z.string().optional(),
+  modelId: z.string().optional(), // Chat model ID for this assistant
   modelFallback: z.string().optional(),
-  tools: z.array(agentToolConfigSchema).default([]),
+  tools: z.array(agentToolConfigSchema).default([]), // List of MCP tool configs available to this assistant
 
   // Timestamps (with defaults for backward compatibility)
-  modelId: z.string().optional(), // Chat model ID for this assistant
-  tools: z.array(z.string()).optional(), // List of MCP tool names available to this assistant
   createdAt: z.number().optional(),
   updatedAt: z.number().optional(),
 })
