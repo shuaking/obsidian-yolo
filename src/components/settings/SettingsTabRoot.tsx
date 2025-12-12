@@ -7,6 +7,7 @@ import SmartComposerPlugin from '../../main'
 import { ObsidianButton } from '../common/ObsidianButton'
 import { ObsidianSetting } from '../common/ObsidianSetting'
 
+import { AgentAnalyticsSection } from './sections/AgentAnalyticsSection'
 import { AssistantsSection } from './sections/AssistantsSection'
 import { ChatPreferencesSection } from './sections/ChatPreferencesSection'
 import { ContinuationSection } from './sections/ContinuationSection'
@@ -46,6 +47,7 @@ function SettingsContent({ app, plugin }: SettingsTabRootProps) {
       <AssistantsSection app={app} />
       <RAGSection app={app} plugin={plugin} />
       <McpSection app={app} plugin={plugin} />
+      <AgentAnalyticsSection />
       <ContinuationSection app={app} />
       <EtcSection app={app} plugin={plugin} />
     </>

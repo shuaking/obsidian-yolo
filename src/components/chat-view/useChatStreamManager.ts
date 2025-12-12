@@ -3,6 +3,7 @@ import { Notice } from 'obsidian'
 import { useCallback, useMemo, useRef } from 'react'
 
 import { useApp } from '../../contexts/app-context'
+import { useDatabase } from '../../contexts/database-context'
 import { useMcp } from '../../contexts/mcp-context'
 import { useSettings } from '../../contexts/settings-context'
 import {
@@ -16,6 +17,7 @@ import { ChatMessage } from '../../types/chat'
 import { ConversationOverrideSettings } from '../../types/conversation-settings.types'
 import { PromptGenerator } from '../../utils/chat/promptGenerator'
 import { ResponseGenerator } from '../../utils/chat/responseGenerator'
+import { extractResponseData } from '../../utils/agent-history/responseDataExtractor'
 import { ErrorModal } from '../modals/ErrorModal'
 
 type UseChatStreamManagerParams = {
@@ -45,6 +47,7 @@ export function useChatStreamManager({
   const app = useApp()
   const { settings } = useSettings()
   const { getMcpManager } = useMcp()
+  const { getAgentHistoryManager } = useDatabase()
 
   const activeStreamAbortControllersRef = useRef<AbortController[]>([])
 
@@ -89,6 +92,11 @@ export function useChatStreamManager({
         return
       }
 
+      const startTime = Date.now()
+      let errorMessage: string | undefined
+      let success: 'success' | 'error' | 'aborted' = 'success'
+      let responseMessages: ChatMessage[] = []
+
       abortActiveStreams()
       const abortController = new AbortController()
       activeStreamAbortControllersRef.current.push(abortController)
@@ -121,7 +129,8 @@ export function useChatStreamManager({
         })
 
         unsubscribeResponseGenerator = responseGenerator.subscribe(
-          (responseMessages) => {
+          (newResponseMessages) => {
+            responseMessages = newResponseMessages
             setChatMessages((prevChatMessages) => {
               const lastMessageIndex = prevChatMessages.findIndex(
                 (message) => message.id === lastMessage.id,
@@ -135,7 +144,7 @@ export function useChatStreamManager({
               }
               return [
                 ...prevChatMessages.slice(0, lastMessageIndex + 1),
-                ...responseMessages,
+                ...newResponseMessages,
               ]
             })
             autoScrollToBottom()
@@ -146,8 +155,11 @@ export function useChatStreamManager({
       } catch (error) {
         // Ignore AbortError
         if (error instanceof Error && error.name === 'AbortError') {
+          success = 'aborted'
           return
         }
+        success = 'error'
+        errorMessage = error instanceof Error ? error.message : String(error)
         throw error
       } finally {
         if (unsubscribeResponseGenerator) {
@@ -157,6 +169,28 @@ export function useChatStreamManager({
           activeStreamAbortControllersRef.current.filter(
             (controller) => controller !== abortController,
           )
+
+        // Record agent history
+        try {
+          const agentHistoryManager = await getAgentHistoryManager()
+          const responseData = extractResponseData(responseMessages)
+
+          await agentHistoryManager.recordAgentInvocation({
+            agentId: modelId,
+            surface: 'chat',
+            conversationId,
+            startTime,
+            endTime: Date.now(),
+            inputTokens: responseData.inputTokens,
+            outputTokens: responseData.outputTokens,
+            totalTokens: responseData.totalTokens,
+            toolCalls: responseData.toolCalls,
+            success,
+            errorMessage,
+          })
+        } catch (err) {
+          console.error('Failed to record agent history:', err)
+        }
       }
     },
     onError: (error) => {
