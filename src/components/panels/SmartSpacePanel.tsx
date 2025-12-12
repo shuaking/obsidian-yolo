@@ -33,6 +33,7 @@ import { PluginProvider, usePlugin } from '../../contexts/plugin-context'
 import { SettingsProvider, useSettings } from '../../contexts/settings-context'
 import { getChatModelClient } from '../../core/llm/manager'
 import SmartComposerPlugin from '../../main'
+import { Assistant } from '../../types/assistant.types'
 import { MentionableFile, MentionableFolder } from '../../types/mentionable'
 import {
   deserializeMentionable,
@@ -48,6 +49,8 @@ import LexicalContentEditable from '../chat-view/chat-input/LexicalContentEditab
 import { ModelSelect } from '../chat-view/chat-input/ModelSelect'
 import { MentionNode } from '../chat-view/chat-input/plugins/mention/MentionNode'
 import { NodeMutations } from '../chat-view/chat-input/plugins/on-mutation/OnMutationPlugin'
+
+import { AssistantSelectMenu } from './quick-ask/AssistantSelectMenu'
 
 type SmartSpacePanelProps = {
   editor: Editor
@@ -71,6 +74,8 @@ function SmartSpacePanelBody({
   const { t } = useLanguage()
   const { settings, setSettings } = useSettings()
   const draftState = useMemo(() => plugin.getSmartSpaceDraftState(), [plugin])
+  const assistants = settings.assistants || []
+  const currentAssistantId = settings.currentAssistantId
   const initialMentionables = useMemo(() => {
     if (!draftState?.mentionables || draftState.mentionables.length === 0) {
       return []
@@ -111,11 +116,20 @@ function SmartSpacePanelBody({
       settings?.chatModelId ??
       '',
   )
+  const [selectedAssistant, setSelectedAssistant] = useState<Assistant | null>(
+    () => {
+      if (currentAssistantId) {
+        return assistants.find((a) => a.id === currentAssistantId) || null
+      }
+      return null
+    },
+  )
   const [mentionables, setMentionables] = useState<SmartSpaceMentionable[]>(
     () => initialMentionables,
   )
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false)
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isAssistantMenuOpen, setIsAssistantMenuOpen] = useState(false)
   const [mentionMenuPlacement, setMentionMenuPlacement] = useState<
     'top' | 'bottom'
   >('top')
@@ -156,7 +170,8 @@ function SmartSpacePanelBody({
     settings?.continuationOptions?.smartSpaceUseWebSearch ?? false
   const derivedUseUrlContext =
     settings?.continuationOptions?.smartSpaceUseUrlContext ?? false
-  const hasBlockingOverlay = isMentionMenuOpen || isModelMenuOpen
+  const hasBlockingOverlay =
+    isMentionMenuOpen || isModelMenuOpen || isAssistantMenuOpen
   const activateKeyboardNavigation = useCallback(() => {
     setIsKeyboardNavigationActive((prev) => (prev ? prev : true))
   }, [])
@@ -668,6 +683,7 @@ function SmartSpacePanelBody({
           payload.length > 0 ? payload : undefined,
           geminiTools,
           mentionables,
+          selectedAssistant,
         )
         shouldPersistDraftRef.current = false
         plugin.setSmartSpaceDraftState(null)
@@ -691,6 +707,7 @@ function SmartSpacePanelBody({
       mentionables,
       onClose,
       plugin,
+      selectedAssistant,
       t,
       useUrlContext,
       useWebSearch,
@@ -910,6 +927,35 @@ function SmartSpacePanelBody({
                 )}
               </div>
               <div className="smtcmp-smart-space-controls">
+                <div
+                  className="smtcmp-smart-space-assistant-select"
+                  style={{ position: 'relative' }}
+                >
+                  {isAssistantMenuOpen && (
+                    <AssistantSelectMenu
+                      assistants={assistants}
+                      currentAssistantId={selectedAssistant?.id}
+                      onSelect={(assistant) => {
+                        setSelectedAssistant(assistant)
+                        setIsAssistantMenuOpen(false)
+                      }}
+                      onClose={() => setIsAssistantMenuOpen(false)}
+                      compact
+                    />
+                  )}
+                  <button
+                    className="smtcmp-smart-space-assistant-trigger"
+                    onClick={() => setIsAssistantMenuOpen(!isAssistantMenuOpen)}
+                    title={
+                      selectedAssistant?.name ??
+                      t('quickAsk.noAssistant', 'No Assistant')
+                    }
+                  >
+                    {selectedAssistant
+                      ? selectedAssistant.name
+                      : t('quickAsk.noAssistant', 'No Assistant')}
+                  </button>
+                </div>
                 <div className="smtcmp-smart-space-model-select">
                   <ModelSelect
                     ref={modelSelectRef}

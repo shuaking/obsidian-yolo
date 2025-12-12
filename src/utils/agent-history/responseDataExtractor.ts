@@ -1,5 +1,6 @@
-import { ChatMessage } from '../../types/chat'
 import { AgentHistoryToolCall } from '../../database/schema'
+import { ChatMessage } from '../../types/chat'
+import { ToolCallResponseStatus } from '../../types/tool-call.types'
 
 export type ResponseData = {
   inputTokens?: number
@@ -18,30 +19,53 @@ export function extractResponseData(messages: ChatMessage[]): ResponseData {
 
   for (const message of messages) {
     // Count tool calls
-    if (message.role === 'tool' && message.toolCalls && Array.isArray(message.toolCalls)) {
-      for (const toolCall of message.toolCalls) {
-        const status =
-          typeof toolCall.response?.status === 'string'
-            ? toolCall.response.status.toLowerCase()
-            : 'success'
+    if (
+      message.role === 'tool' &&
+      'toolCalls' in message &&
+      message.toolCalls &&
+      Array.isArray(message.toolCalls)
+    ) {
+      const toolMessage = message
+      for (const toolCall of toolMessage.toolCalls) {
+        const status = toolCall.response?.status ?? 'success'
+        let result_text: string | undefined = undefined
+
+        // Extract result text based on response type
+        if (
+          status === ToolCallResponseStatus.Success &&
+          'data' in toolCall.response
+        ) {
+          const data = (toolCall.response as any).data
+          result_text = typeof data?.text === 'string' ? data.text : undefined
+        } else if (
+          status === ToolCallResponseStatus.Error &&
+          'error' in toolCall.response
+        ) {
+          result_text = (toolCall.response as any).error
+        }
 
         result.toolCalls!.push({
           name: toolCall.request?.name || 'unknown',
           status: status as any,
-          result: typeof toolCall.response?.output === 'string'
-            ? toolCall.response.output
-            : undefined,
+          result: result_text,
         })
       }
     }
 
-    // Extract token usage from usage metadata
-    if (message.usage) {
-      if (message.usage.input_tokens !== undefined) {
-        totalInputTokens = message.usage.input_tokens
-      }
-      if (message.usage.output_tokens !== undefined) {
-        totalOutputTokens = message.usage.output_tokens
+    // Extract token usage from metadata
+    if (
+      message.role === 'assistant' &&
+      'metadata' in message &&
+      message.metadata
+    ) {
+      const usage = message.metadata.usage
+      if (usage) {
+        if (usage.prompt_tokens !== undefined) {
+          totalInputTokens = usage.prompt_tokens
+        }
+        if (usage.completion_tokens !== undefined) {
+          totalOutputTokens = usage.completion_tokens
+        }
       }
     }
   }

@@ -1,5 +1,10 @@
 import { EditorView } from '@codemirror/view'
-import { $getRoot, $nodesOfType, LexicalEditor, SerializedEditorState } from 'lexical'
+import {
+  $getRoot,
+  $nodesOfType,
+  LexicalEditor,
+  SerializedEditorState,
+} from 'lexical'
 import {
   ChevronDown,
   ChevronUp,
@@ -17,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { ApplyViewState } from '../../../ApplyView'
 import { APPLY_VIEW_TYPE } from '../../../constants'
 import { useApp } from '../../../contexts/app-context'
+import { useDatabase } from '../../../contexts/database-context'
 import { useLanguage } from '../../../contexts/language-context'
 import { useMcp } from '../../../contexts/mcp-context'
 import { useRAG } from '../../../contexts/rag-context'
@@ -27,22 +33,23 @@ import SmartComposerPlugin from '../../../main'
 import { Assistant } from '../../../types/assistant.types'
 import { ChatMessage, ChatUserMessage } from '../../../types/chat'
 import { Mentionable, SerializedMentionable } from '../../../types/mentionable'
+import { extractResponseData } from '../../../utils/agent-history/responseDataExtractor'
+import { renderAssistantIcon } from '../../../utils/assistant-icon'
+import { generateEditContent } from '../../../utils/chat/editMode'
 import {
   deserializeMentionable,
   getMentionableKey,
   serializeMentionable,
 } from '../../../utils/chat/mentionable'
-import { renderAssistantIcon } from '../../../utils/assistant-icon'
-import { generateEditContent } from '../../../utils/chat/editMode'
+import { parseTagContents } from '../../../utils/chat/parse-tag-content'
 import { PromptGenerator } from '../../../utils/chat/promptGenerator'
 import { ResponseGenerator } from '../../../utils/chat/responseGenerator'
-import { parseTagContents } from '../../../utils/chat/parse-tag-content'
-import AssistantMessageReasoning from '../../chat-view/AssistantMessageReasoning'
 import {
   applySearchReplaceBlocks,
   parseSearchReplaceBlocks,
 } from '../../../utils/chat/searchReplace'
 import { readTFileContent } from '../../../utils/obsidian'
+import AssistantMessageReasoning from '../../chat-view/AssistantMessageReasoning'
 import LexicalContentEditable from '../../chat-view/chat-input/LexicalContentEditable'
 import { ModelSelect } from '../../chat-view/chat-input/ModelSelect'
 import { MentionNode } from '../../chat-view/chat-input/plugins/mention/MentionNode'
@@ -68,7 +75,8 @@ type QuickAskPanelProps = {
 function SimpleMarkdownContent({
   content,
   component,
-  scale, // scale is unused here but kept for interface compatibility
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  scale,
 }: {
   content: string
   component: Component
@@ -115,6 +123,7 @@ export function QuickAskPanel({
   const { t } = useLanguage()
   const { getRAGEngine } = useRAG()
   const { getMcpManager } = useMcp()
+  const { getAgentHistoryManager } = useDatabase()
   const { createOrUpdateConversation, generateConversationTitle } =
     useChatHistory()
 
@@ -168,7 +177,12 @@ export function QuickAskPanel({
   }>({})
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
-  const dragStartRef = useRef<{ x: number; y: number; panelX: number; panelY: number } | null>(null)
+  const dragStartRef = useRef<{
+    x: number
+    y: number
+    panelX: number
+    panelY: number
+  } | null>(null)
   const resizeStartRef = useRef<{
     direction: 'right' | 'bottom' | 'bottom-right'
     x: number
@@ -176,7 +190,10 @@ export function QuickAskPanel({
     width: number
     height: number
   } | null>(null)
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number } | null>(null)
+  const [panelSize, setPanelSize] = useState<{
+    width: number
+    height: number
+  } | null>(null)
   const renderAssistantBlocks = useCallback(
     (rawContent: string | undefined | null) => {
       const parsed = parseTagContents(rawContent ?? '')
@@ -190,6 +207,7 @@ export function QuickAskPanel({
               key={index}
               reasoning={block.content}
               content={rawContent ?? ''}
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               MarkdownComponent={({ content, scale }) => (
                 <SimpleMarkdownContent content={content} component={plugin} />
               )}
@@ -538,6 +556,11 @@ export function QuickAskPanel({
       const abortController = new AbortController()
       abortControllerRef.current = abortController
 
+      const startTime = Date.now()
+      let success: 'success' | 'error' | 'aborted' = 'success'
+      let errorMessage: string | undefined
+      let responseMessages: ChatMessage[] = []
+
       try {
         const mcpManager = await getMcpManager()
 
@@ -556,18 +579,24 @@ export function QuickAskPanel({
           },
         })
 
-        const unsubscribe = responseGenerator.subscribe((responseMessages) => {
-          setChatMessages((prev) => {
-            const lastMessageIndex = prev.findIndex(
-              (m) => m.id === userMessage.id,
-            )
-            if (lastMessageIndex === -1) {
-              abortController.abort()
-              return prev
-            }
-            return [...prev.slice(0, lastMessageIndex + 1), ...responseMessages]
-          })
-        })
+        const unsubscribe = responseGenerator.subscribe(
+          (newResponseMessages) => {
+            responseMessages = newResponseMessages
+            setChatMessages((prev) => {
+              const lastMessageIndex = prev.findIndex(
+                (m) => m.id === userMessage.id,
+              )
+              if (lastMessageIndex === -1) {
+                abortController.abort()
+                return prev
+              }
+              return [
+                ...prev.slice(0, lastMessageIndex + 1),
+                ...newResponseMessages,
+              ]
+            })
+          },
+        )
 
         await responseGenerator.run()
         unsubscribe()
@@ -584,11 +613,37 @@ export function QuickAskPanel({
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           // Aborted by user
+          success = 'aborted'
           return
         }
+        success = 'error'
+        errorMessage = error instanceof Error ? error.message : String(error)
         console.error('Quick ask failed:', error)
         new Notice(t('quickAsk.error', 'Failed to generate response'))
       } finally {
+        // Record agent history
+        try {
+          const agentHistoryManager = await getAgentHistoryManager()
+          const responseData = extractResponseData(responseMessages)
+          const agentId = selectedAssistant?.id ?? 'default'
+
+          await agentHistoryManager.recordAgentInvocation({
+            agentId,
+            surface: 'quick-ask',
+            conversationId,
+            startTime,
+            endTime: Date.now(),
+            inputTokens: responseData.inputTokens,
+            outputTokens: responseData.outputTokens,
+            totalTokens: responseData.totalTokens,
+            toolCalls: responseData.toolCalls,
+            success,
+            errorMessage,
+          })
+        } catch (err) {
+          console.error('Failed to record agent history:', err)
+        }
+
         setIsStreaming(false)
         abortControllerRef.current = null
       }
@@ -598,12 +653,14 @@ export function QuickAskPanel({
       conversationId,
       createOrUpdateConversation,
       generateConversationTitle,
+      getAgentHistoryManager,
       getMcpManager,
       isStreaming,
       mentionables,
       model,
       promptGenerator,
       providerClient,
+      selectedAssistant,
       settings,
       t,
     ],
@@ -634,6 +691,10 @@ export function QuickAskPanel({
       })
       setInputText('')
 
+      const startTime = Date.now()
+      let success: 'success' | 'error' | 'aborted' = 'success'
+      let errorMessage: string | undefined
+
       try {
         const currentContent = await readTFileContent(activeFile, app.vault)
 
@@ -652,6 +713,8 @@ export function QuickAskPanel({
           new Notice(
             t('quickAsk.editNoChanges', 'No valid changes returned by model'),
           )
+          success = 'error'
+          errorMessage = 'No valid changes returned by model'
           return
         }
 
@@ -668,6 +731,8 @@ export function QuickAskPanel({
               'Could not apply any changes. The model output may not match the document.',
             ),
           )
+          success = 'error'
+          errorMessage = 'Could not apply any changes'
           return
         }
 
@@ -689,13 +754,43 @@ export function QuickAskPanel({
         // Close Quick Ask
         onClose()
       } catch (error) {
+        success = 'error'
+        errorMessage = error instanceof Error ? error.message : String(error)
         console.error('Edit mode failed:', error)
         new Notice(t('quickAsk.error', 'Failed to generate edits'))
       } finally {
+        // Record agent history
+        try {
+          const agentHistoryManager = await getAgentHistoryManager()
+          const agentId = selectedAssistant?.id ?? 'default'
+
+          await agentHistoryManager.recordAgentInvocation({
+            agentId,
+            surface: 'quick-ask',
+            conversationId,
+            startTime,
+            endTime: Date.now(),
+            success,
+            errorMessage,
+          })
+        } catch (err) {
+          console.error('Failed to record agent history:', err)
+        }
+
         setIsStreaming(false)
       }
     },
-    [app, isStreaming, model, onClose, providerClient, t],
+    [
+      app,
+      conversationId,
+      getAgentHistoryManager,
+      isStreaming,
+      model,
+      onClose,
+      providerClient,
+      selectedAssistant,
+      t,
+    ],
   )
 
   // Submit edit-direct mode - generate and apply edits directly without confirmation
@@ -723,6 +818,10 @@ export function QuickAskPanel({
       })
       setInputText('')
 
+      const startTime = Date.now()
+      let success: 'success' | 'error' | 'aborted' = 'success'
+      let errorMessage: string | undefined
+
       try {
         const currentContent = await readTFileContent(activeFile, app.vault)
 
@@ -741,6 +840,8 @@ export function QuickAskPanel({
           new Notice(
             t('quickAsk.editNoChanges', 'No valid changes returned by model'),
           )
+          success = 'error'
+          errorMessage = 'No valid changes returned by model'
           return
         }
 
@@ -757,6 +858,8 @@ export function QuickAskPanel({
               'Could not apply any changes. The model output may not match the document.',
             ),
           )
+          success = 'error'
+          errorMessage = 'Could not apply any changes'
           return
         }
 
@@ -785,13 +888,43 @@ export function QuickAskPanel({
         // Close Quick Ask
         onClose()
       } catch (error) {
+        success = 'error'
+        errorMessage = error instanceof Error ? error.message : String(error)
         console.error('Edit-direct mode failed:', error)
         new Notice(t('quickAsk.error', 'Failed to apply edits'))
       } finally {
+        // Record agent history
+        try {
+          const agentHistoryManager = await getAgentHistoryManager()
+          const agentId = selectedAssistant?.id ?? 'default'
+
+          await agentHistoryManager.recordAgentInvocation({
+            agentId,
+            surface: 'quick-ask',
+            conversationId,
+            startTime,
+            endTime: Date.now(),
+            success,
+            errorMessage,
+          })
+        } catch (err) {
+          console.error('Failed to record agent history:', err)
+        }
+
         setIsStreaming(false)
       }
     },
-    [app, isStreaming, model, onClose, providerClient, t],
+    [
+      app,
+      conversationId,
+      getAgentHistoryManager,
+      isStreaming,
+      model,
+      onClose,
+      providerClient,
+      selectedAssistant,
+      t,
+    ],
   )
 
   // Handle mode change
@@ -946,10 +1079,16 @@ export function QuickAskPanel({
       let newWidth = resizeStartRef.current.width
       let newHeight = resizeStartRef.current.height
 
-      if (resizeStartRef.current.direction === 'right' || resizeStartRef.current.direction === 'bottom-right') {
+      if (
+        resizeStartRef.current.direction === 'right' ||
+        resizeStartRef.current.direction === 'bottom-right'
+      ) {
         newWidth = Math.max(300, resizeStartRef.current.width + deltaX)
       }
-      if (resizeStartRef.current.direction === 'bottom' || resizeStartRef.current.direction === 'bottom-right') {
+      if (
+        resizeStartRef.current.direction === 'bottom' ||
+        resizeStartRef.current.direction === 'bottom-right'
+      ) {
         newHeight = Math.max(200, resizeStartRef.current.height + deltaY)
       }
 
@@ -977,36 +1116,43 @@ export function QuickAskPanel({
   }, [isResizing, containerRef, onResize])
 
   // Drag handle mouse down
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    if (!containerRef?.current) return
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (!containerRef?.current) return
 
-    const rect = containerRef.current.getBoundingClientRect()
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      panelX: rect.left,
-      panelY: rect.top,
-    }
-    setIsDragging(true)
-    e.preventDefault()
-  }, [containerRef])
+      const rect = containerRef.current.getBoundingClientRect()
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panelX: rect.left,
+        panelY: rect.top,
+      }
+      setIsDragging(true)
+      e.preventDefault()
+    },
+    [containerRef],
+  )
 
   // Resize handle mouse down
-  const handleResizeStart = useCallback((direction: 'right' | 'bottom' | 'bottom-right') => (e: React.MouseEvent) => {
-    if (!containerRef?.current) return
+  const handleResizeStart = useCallback(
+    (direction: 'right' | 'bottom' | 'bottom-right') =>
+      (e: React.MouseEvent) => {
+        if (!containerRef?.current) return
 
-    const rect = containerRef.current.getBoundingClientRect()
-    resizeStartRef.current = {
-      direction,
-      x: e.clientX,
-      y: e.clientY,
-      width: rect.width,
-      height: rect.height,
-    }
-    setIsResizing(true)
-    e.preventDefault()
-    e.stopPropagation()
-  }, [containerRef])
+        const rect = containerRef.current.getBoundingClientRect()
+        resizeStartRef.current = {
+          direction,
+          x: e.clientX,
+          y: e.clientY,
+          width: rect.width,
+          height: rect.height,
+        }
+        setIsResizing(true)
+        e.preventDefault()
+        e.stopPropagation()
+      },
+    [containerRef],
+  )
 
   return (
     <div
@@ -1107,6 +1253,7 @@ export function QuickAskPanel({
                     <AssistantMessageReasoning
                       reasoning={message.reasoning}
                       content={message.content}
+                      // eslint-disable-next-line @typescript-eslint/no-unused-vars
                       MarkdownComponent={({ content, scale }) => (
                         <SimpleMarkdownContent
                           content={content}
