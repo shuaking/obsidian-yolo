@@ -2403,6 +2403,7 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     customPrompt?: string,
     geminiTools?: { useWebSearch?: boolean; useUrlContext?: boolean },
     mentionables?: (MentionableFile | MentionableFolder)[],
+    selectedAssistant?: any,
   ) {
     // Check if this is actually a rewrite request from Selection Chat
     if (this.pendingSelectionRewrite) {
@@ -2428,6 +2429,7 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
       customPrompt,
       geminiTools,
       mentionables,
+      selectedAssistant,
     )
   }
 
@@ -2441,6 +2443,7 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     customPrompt?: string,
     geminiTools?: { useWebSearch?: boolean; useUrlContext?: boolean },
     mentionables?: (MentionableFile | MentionableFolder)[],
+    selectedAssistant?: any,
   ) {
     // 先取消所有进行中的任务，避免旧任务的流式响应覆盖新任务的状态
     this.cancelAllAiTasks()
@@ -2450,6 +2453,9 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     const controller = new AbortController()
     this.activeAbortControllers.add(controller)
     let view: EditorView | null = null
+    const startTime = Date.now()
+    let success: 'success' | 'error' | 'aborted' = 'success'
+    let errorMessage: string | undefined
 
     try {
       const notice = new Notice('Generating continuation...', 0)
@@ -2888,13 +2894,34 @@ ${validationResult.error.issues.map((v) => v.message).join('\n')}`)
     } catch (error) {
       this.clearInlineSuggestion()
       if (error?.name === 'AbortError') {
+        success = 'aborted'
         const n = new Notice('已取消生成。')
         this.registerTimeout(() => n.hide(), 1000)
       } else {
+        success = 'error'
+        errorMessage = error instanceof Error ? error.message : String(error)
         console.error(error)
         new Notice('Failed to generate continuation.')
       }
     } finally {
+      // Record agent history for Smart Space
+      try {
+        const dbManager = await this.getDbManager()
+        const agentHistoryManager = dbManager.getAgentHistoryManager()
+        const agentId = selectedAssistant?.id ?? 'default'
+
+        await agentHistoryManager.recordAgentInvocation({
+          agentId,
+          surface: 'smart-space',
+          startTime,
+          endTime: Date.now(),
+          success,
+          errorMessage,
+        })
+      } catch (err) {
+        console.error('Failed to record agent history:', err)
+      }
+
       // 确保思考指示器被移除
       if (view) {
         this.hideThinkingIndicator(view)
