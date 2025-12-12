@@ -1,11 +1,13 @@
 import * as Popover from '@radix-ui/react-popover'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import { useLanguage } from '../../contexts/language-context'
 import { useSettings } from '../../contexts/settings-context'
+import { useMcp } from '../../contexts/mcp-context'
 import { Assistant } from '../../types/assistant.types'
 import { renderAssistantIcon } from '../../utils/assistant-icon'
+import { computeAssistantToolStats } from '../../utils/assistant-config'
 
 export function AssistantSelector() {
   const { settings, setSettings } = useSettings()

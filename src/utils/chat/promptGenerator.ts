@@ -30,6 +30,7 @@ import {
 } from '../obsidian'
 
 import { YoutubeTranscript, isYoutubeUrl } from './youtube-transcript'
+import { buildAssistantInstructionPrompt } from '../assistant-config'
 
 export class PromptGenerator {
   private getRagEngine: () => Promise<RAGEngine>
@@ -475,40 +476,7 @@ ${await this.getWebsiteContent(url)}
   }
 
   private buildCustomInstructionsSection(): string | null {
-    // Get custom system prompt
-    const customInstruction = this.settings.systemPrompt.trim()
-
-    // Get currently selected assistant
-    const currentAssistantId = this.settings.currentAssistantId
-    const assistants = this.settings.assistants || []
-    // Only use assistant if explicitly selected (currentAssistantId is not undefined)
-    const currentAssistant = currentAssistantId
-      ? assistants.find((a) => a.id === currentAssistantId)
-      : null
-
-    // If there's no custom prompt and no selected assistant, return null
-    if (!customInstruction && !currentAssistant) {
-      return null
-    }
-
-    // Build prompt content
-    const parts: string[] = []
-
-    // Add assistant's system prompt (if available) - this is the primary instruction
-    if (currentAssistant?.systemPrompt) {
-      parts.push(`<assistant_instructions name="${currentAssistant.name}">
-${currentAssistant.systemPrompt}
-</assistant_instructions>`)
-    }
-
-    // Add global custom instructions (if available)
-    if (customInstruction) {
-      parts.push(`<custom_instructions>
-${customInstruction}
-</custom_instructions>`)
-    }
-
-    return parts.join('\n\n')
+    return buildAssistantInstructionPrompt(this.settings)
   }
 
   private buildDefaultBehaviorSection(hasTools: boolean): string {

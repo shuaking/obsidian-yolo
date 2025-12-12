@@ -31,6 +31,8 @@ export const assistantSchema = z.object({
   tools: z.array(agentToolConfigSchema).default([]),
 
   // Timestamps (with defaults for backward compatibility)
+  modelId: z.string().optional(), // Chat model ID for this assistant
+  tools: z.array(z.string()).optional(), // List of MCP tool names available to this assistant
   createdAt: z.number().optional(),
   updatedAt: z.number().optional(),
 })
