@@ -586,6 +586,28 @@ export type TranslationKeys = {
       webSearch?: string
       urlContext?: string
     }
+    agentAnalytics?: {
+      name?: string
+      desc?: string
+      totalInvocations?: string
+      successful?: string
+      failed?: string
+      failureRate?: string
+      averageTokens?: string
+      toolUsageRate?: string
+      totalTokens?: string
+      avgExecutionTime?: string
+      filters?: string
+      filterByAgent?: string
+      filterBySurface?: string
+      recentSessions?: string
+      noRecords?: string
+      exportCSV?: string
+      exportJSON?: string
+      refresh?: string
+      clear?: string
+      clearConfirm?: string
+    }
   }
 
   // Notices and Messages

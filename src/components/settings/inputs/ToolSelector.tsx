@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
-import { ObsidianButton } from '../../common/ObsidianButton'
-import { useMcp } from '../../../contexts/mcp-context'
+
 import { useLanguage } from '../../../contexts/language-context'
+import { useMcp } from '../../../contexts/mcp-context'
+import { parseToolName } from '../../../core/mcp/tool-name-utils'
+import { AgentToolConfig } from '../../../types/assistant.types'
 import { McpTool } from '../../../types/mcp.types'
+import { ObsidianButton } from '../../common/ObsidianButton'
 import { ObsidianSetting } from '../../common/ObsidianSetting'
 
 type ToolSelectorProps = {
-  selectedTools: string[]
-  onToolsChange: (tools: string[]) => void
+  selectedTools: AgentToolConfig[]
+  onToolsChange: (tools: AgentToolConfig[]) => void
   disabled?: boolean
 }
 
@@ -32,7 +35,9 @@ export function ToolSelector({
         setAvailableTools(tools)
       } catch (error) {
         console.error('Failed to load available tools:', error)
-        setError(error instanceof Error ? error.message : 'Failed to load tools')
+        setError(
+          error instanceof Error ? error.message : 'Failed to load tools',
+        )
       } finally {
         setIsLoading(false)
       }
@@ -41,15 +46,41 @@ export function ToolSelector({
     void loadTools()
   }, [getMcpManager])
 
-  const toggleTool = (toolName: string) => {
-    const newTools = selectedTools.includes(toolName)
-      ? selectedTools.filter((t) => t !== toolName)
-      : [...selectedTools, toolName]
-    onToolsChange(newTools)
+  const toggleTool = (tool: McpTool) => {
+    const { serverName, toolName } = parseToolName(tool.name)
+    const isSelected = selectedTools.some(
+      (t) => t.serverId === serverName && t.toolName === toolName,
+    )
+
+    if (isSelected) {
+      const newTools = selectedTools.filter(
+        (t) => !(t.serverId === serverName && t.toolName === toolName),
+      )
+      onToolsChange(newTools)
+    } else {
+      const newTools = [
+        ...selectedTools,
+        {
+          serverId: serverName,
+          toolName: toolName,
+          enabled: true,
+        },
+      ]
+      onToolsChange(newTools)
+    }
   }
 
   const selectAllTools = () => {
-    onToolsChange(availableTools.map((tool) => tool.name))
+    onToolsChange(
+      availableTools.map((tool) => {
+        const { serverName, toolName } = parseToolName(tool.name)
+        return {
+          serverId: serverName,
+          toolName: toolName,
+          enabled: true,
+        }
+      }),
+    )
   }
 
   const clearAllTools = () => {
@@ -60,9 +91,14 @@ export function ToolSelector({
     return (
       <ObsidianSetting
         name={t('settings.agents.tools', 'Tools')}
-        desc={t('settings.agents.toolsDesc', 'MCP tools available to this agent')}
+        desc={t(
+          'settings.agents.toolsDesc',
+          'MCP tools available to this agent',
+        )}
       >
-        <div className="smtcmp-loading">{t('common.loading', 'Loading...')}</div>
+        <div className="smtcmp-loading">
+          {t('common.loading', 'Loading...')}
+        </div>
       </ObsidianSetting>
     )
   }
@@ -71,7 +107,10 @@ export function ToolSelector({
     return (
       <ObsidianSetting
         name={t('settings.agents.tools', 'Tools')}
-        desc={t('settings.agents.toolsDesc', 'MCP tools available to this agent')}
+        desc={t(
+          'settings.agents.toolsDesc',
+          'MCP tools available to this agent',
+        )}
       >
         <div className="smtcmp-error">{error}</div>
       </ObsidianSetting>
@@ -82,7 +121,10 @@ export function ToolSelector({
     return (
       <ObsidianSetting
         name={t('settings.agents.tools', 'Tools')}
-        desc={t('settings.agents.toolsDesc', 'MCP tools available to this agent')}
+        desc={t(
+          'settings.agents.toolsDesc',
+          'MCP tools available to this agent',
+        )}
       >
         <div className="smtcmp-no-tools">
           {t('settings.agents.noToolsAvailable', 'No MCP tools available')}
@@ -101,7 +143,9 @@ export function ToolSelector({
           <ObsidianButton
             text={t('common.selectAll', 'Select all')}
             onClick={selectAllTools}
-            disabled={disabled || availableTools.length === selectedTools.length}
+            disabled={
+              disabled || availableTools.length === selectedTools.length
+            }
           />
           <ObsidianButton
             text={t('common.clear', 'Clear')}
@@ -110,34 +154,41 @@ export function ToolSelector({
           />
         </div>
         <div className="smtcmp-tool-selector-list">
-          {availableTools.map((tool) => (
-            <label
-              key={tool.name}
-              className={`smtcmp-tool-selector-item ${disabled ? 'disabled' : ''}`}
-            >
-              <input
-                type="checkbox"
-                checked={selectedTools.includes(tool.name)}
-                onChange={() => toggleTool(tool.name)}
-                disabled={disabled}
-              />
-              <div className="smtcmp-tool-selector-item-content">
-                <div className="smtcmp-tool-selector-item-name">
-                  {tool.name}
+          {availableTools.map((tool) => {
+            const { serverName, toolName } = parseToolName(tool.name)
+            const isChecked = selectedTools.some(
+              (t) => t.serverId === serverName && t.toolName === toolName,
+            )
+            return (
+              <label
+                key={tool.name}
+                className={`smtcmp-tool-selector-item ${disabled ? 'disabled' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleTool(tool)}
+                  disabled={disabled}
+                />
+                <div className="smtcmp-tool-selector-item-content">
+                  <div className="smtcmp-tool-selector-item-name">
+                    {tool.name}
+                  </div>
+                  {tool.description && (
+                    <div className="smtcmp-tool-selector-item-desc">
+                      {tool.description}
+                    </div>
+                  )}
+                  {tool.inputSchema?.type && (
+                    <div className="smtcmp-tool-selector-item-schema">
+                      {t('settings.agents.schema', 'Schema')}:{' '}
+                      {tool.inputSchema.type}
+                    </div>
+                  )}
                 </div>
-                {tool.description && (
-                  <div className="smtcmp-tool-selector-item-desc">
-                    {tool.description}
-                  </div>
-                )}
-                {tool.inputSchema && tool.inputSchema.type && (
-                  <div className="smtcmp-tool-selector-item-schema">
-                    {t('settings.agents.schema', 'Schema')}: {tool.inputSchema.type}
-                  </div>
-                )}
-              </div>
-            </label>
-          ))}
+              </label>
+            )
+          })}
         </div>
       </div>
     </ObsidianSetting>
