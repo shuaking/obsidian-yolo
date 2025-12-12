@@ -12,10 +12,10 @@ Successfully extracted and prepared all three core distribution files for the ob
 
 ### 1. main.js
 - **Path**: `dist/plugin/main.js`
-- **Size**: 9.6 MB (9,968,444 bytes)
+- **Size**: 9.6 MB (9,968,415 bytes)
 - **Type**: Compiled JavaScript plugin code
 - **Status**: ✅ Successfully built
-- **SHA256**: `fa1ede3e5936110a453b04bcba738b1cad8122ba26902ce0a29be19e744eef23`
+- **SHA256**: `e97197bf9042398bddd5d3768e4b7085c4530979f08782bce7d50eaa4e6aa77d`
 
 ### 2. manifest.json
 - **Path**: `dist/plugin/manifest.json`
@@ -103,6 +103,6 @@ SHA256 checksums are available in `dist/plugin/checksums.txt` for file integrity
 
 The obsidian-yolo plugin distribution files have been successfully extracted, verified, and packaged. All files are ready for distribution and installation in Obsidian.
 
-**Build Date**: December 12, 2024  
+**Build Date**: December 12, 2025  
 **Plugin Version**: 1.4.9  
 **Status**: ✅ READY FOR DISTRIBUTION
